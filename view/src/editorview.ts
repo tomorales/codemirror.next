@@ -1,7 +1,8 @@
 import {EditorState, Transaction, MetaSlot} from "../../state/src"
+import {styleModule, StyleModule} from "stylemodule"
 import {DocView, EditorViewport} from "./docview"
 import {InputState, MouseSelectionUpdate} from "./input"
-import {getRoot, Rect} from "./dom"
+import {getRoot, maybeGetRoot, Rect} from "./dom"
 import {Decoration, DecorationSet} from "./decoration"
 import {applyDOMChange} from "./domchange"
 import {movePos, posAtCoords} from "./cursor"
@@ -9,6 +10,7 @@ import {LineHeight} from "./heightmap"
 
 export class EditorView {
   private _state!: EditorState
+  private _root: DocumentOrShadowRoot | null = null
   get state(): EditorState { return this._state }
 
   readonly dispatch: (tr: Transaction) => void
@@ -33,15 +35,13 @@ export class EditorView {
   constructor(state: EditorState, dispatch?: ((tr: Transaction) => void | null), ...plugins: PluginView[]) {
     this.dispatch = dispatch || (tr => this.updateState([tr], tr.apply()))
 
-    this.contentDOM = document.createElement("pre")
-    this.contentDOM.className = "CodeMirror-content"
-    this.contentDOM.style.cssText = contentCSS
+    this.contentDOM = document.createElement("div")
+    this.contentDOM.className = "codemirror-content " + styles.content
     this.contentDOM.setAttribute("contenteditable", "true")
-    this.contentDOM.setAttribute("spellcheck", "false")
+    this.contentDOM.setAttribute("spellcheck", "false") // FIXME configurable
 
     this.dom = document.createElement("div")
-    this.dom.style.cssText = editorCSS
-    this.dom.className = "CodeMirror"
+    this.dom.className = "codemirror " + styles.wrapper
     this.dom.appendChild(this.contentDOM)
 
     this.docView = new DocView(this.contentDOM, {
@@ -56,7 +56,19 @@ export class EditorView {
       onUpdateViewport: () => {
         for (let plugin of this.pluginViews) if (plugin.updateViewport) plugin.updateViewport(this)
       },
-      getDecorations: () => this.pluginViews.map(v => v.decorations || Decoration.none)
+      getDecorations: () => this.pluginViews.map(v => v.decorations || Decoration.none),
+      checkRoot: () => {
+        let found = maybeGetRoot(this.dom)
+        if (found != this._root) {
+          this._root = found
+          if (found) {
+            for (let {styles} of this.pluginViews)
+              if (styles) styleModule.mount(found, styles)
+            styleModule.mount(found, styles)
+          }
+        }
+        return found || document
+      }
     })
     this.viewport = this.docView.publicViewport
     this.setState(state, ...plugins)
@@ -117,6 +129,8 @@ export class EditorView {
     for (let plugin of plugins) this.pluginViews.push(plugin)
     for (let plugin of this.state.plugins) if (plugin.view)
       this.pluginViews.push(plugin.view(this))
+    if (this._root) for (let {styles} of this.pluginViews)
+      if (styles) styleModule.mount(this._root, styles)
   }
 
   private destroyPluginViews() {
@@ -173,11 +187,11 @@ export class EditorView {
   }
 
   get root(): DocumentOrShadowRoot {
-    return getRoot(this.dom)
+    return this._root || getRoot(this.dom)
   }
 
   hasFocus(): boolean {
-    return getRoot(this.dom).activeElement == this.contentDOM
+    return this.root.activeElement == this.contentDOM
   }
 
   focus() {
@@ -200,18 +214,44 @@ export interface PluginView {
   // This should return a stable value, not compute something on the fly
   decorations?: DecorationSet
   destroy?: () => void
+  styles?: StyleModule
 }
 
 function setTabSize(elt: HTMLElement, size: number) {
   (elt.style as any).tabSize = (elt.style as any).MozTabSize = size
 }
 
-const editorCSS = `
-position: relative;
-display: flex;
-align-items: flex-start;`
+const styles = styleModule({
+  wrapper: {
+    position: "relative !important",
+    display: "flex !important",
+    alignItems: "flex-start !important",
+    fontFamily: "monospace",
+    lineHeight: 1.4,
 
-const contentCSS = `
-margin: 0;
-flex-grow: 2;
-min-height: 100%;`
+    "&.focused": {
+      // FIXME it would be great if we could directly use the browser's
+      // default focus outline, but it appears we can't, so this tries to
+      // approximate that
+      outline_fallback: "1px dotted #212121",
+      outline: "5px auto -webkit-focus-ring-color"
+    }
+  },
+
+  content: {
+    margin: 0,
+    flexGrow: 2,
+    minHeight: "100%",
+    display: "block",
+    whiteSpace: "pre",
+    boxSizing: "border-box",
+
+    padding: "4px 2px 4px 4px",
+    outline: "none",
+    caretColor: "black",
+
+    "& codemirror-line": {
+      display: "block"
+    }
+  }
+}, {priority: 0})

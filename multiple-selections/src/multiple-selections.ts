@@ -1,5 +1,6 @@
 import {Plugin, EditorState} from "../../state/src"
 import {EditorView, DecorationSet, Decoration, WidgetType, RangeDecorationSpec} from "../../view/src"
+import {styleModule} from "stylemodule"
 
 export function multipleSelections() {
   return new Plugin({
@@ -11,7 +12,7 @@ export function multipleSelections() {
 class CursorWidget extends WidgetType<null> {
   toDOM() {
     let span = document.createElement("span")
-    span.className = "CodeMirror-secondary-cursor"
+    span.className = styles.secondaryCursor
     return span
   }
 }
@@ -22,7 +23,7 @@ class MultipleSelectionView {
 
   constructor(view: EditorView) {
     this.update(view.state)
-    this.rangeConfig = {class: "CodeMirror-secondary-selection"} // FIXME configurable?
+    this.rangeConfig = {class: styles.secondarySelection} // FIXME themable?
   }
 
   updateState(view: EditorView, prevState: EditorState) {
@@ -44,4 +45,24 @@ class MultipleSelectionView {
     }
     this.decorations = Decoration.set(deco)
   }
+
+  get styles() { return styles }
 }
+
+const styles = styleModule({
+  secondarySelection: {
+    backgroundColor_fallback: "#3297FD",
+    color_fallback: "white !important",
+    backgroundColor: "Highlight",
+    color: "HighlightText !important"
+  },
+
+  secondaryCursor: {
+    display: "inline-block",
+    verticalAlign: "text-top",
+    borderLeft: "1px solid #555",
+    width: 0,
+    height: "1.15em",
+    margin: "0 -0.5px -.5em"
+  }
+})

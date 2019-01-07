@@ -1,11 +1,13 @@
 import browser from "./browser"
 
-export let getRoot: (dom: HTMLElement) => DocumentOrShadowRoot =
+export let maybeGetRoot: (dom: HTMLElement) => DocumentOrShadowRoot | null =
   typeof document == "undefined" || (document as any).getRootNode ?
   (dom: HTMLElement) => {
     let root = (dom as any).getRootNode()
-    return root.nodeType == 9 || root.nodeType == 11 ? root : document
+    return root.nodeType == 9 || root.nodeType == 11 ? root : null
   } : () => document
+
+export function getRoot(dom: HTMLElement) { return maybeGetRoot(dom) || document }
 
 // Work around Chrome issue https://bugs.chromium.org/p/chromium/issues/detail?id=447523
 // (isCollapsed inappropriately returns true in shadow dom)
@@ -61,7 +63,7 @@ function scanFor(node: Node, off: number, targetNode: Node, targetOff: number, d
   for (;;) {
     if (node == targetNode && off == targetOff) return true
     if (off == (dir < 0 ? 0 : maxOffset(node))) {
-      if (node.nodeName == "DIV" || node.nodeName == "PRE") return false
+      if (node.nodeName == "DIV") return false
       let parent = node.parentNode
       if (!parent || parent.nodeType != 1) return false
       off = domIndex(node) + (dir < 0 ? 0 : 1)

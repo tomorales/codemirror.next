@@ -2,6 +2,7 @@ import {Text} from "../../doc/src"
 import {EditorState, Plugin} from "../../state/src"
 import {EditorView} from "../../view/src/"
 import {Decoration, DecorationSet, RangeDecoration} from "../../view/src/decoration"
+import {styleModule} from "stylemodule"
 
 const matching: {[key: string]: string | undefined} = {"(": ")>", ")": "(<", "[": "]>", "]": "[<", "{": "}>", "}": "{<"}
 
@@ -78,7 +79,7 @@ function doMatchBrackets(state: EditorState, referenceDecorations: DecorationSet
     if (!range.empty) continue
     const match = findMatchingBracket(state.doc, referenceDecorations, range.head, config)
     if (!match) continue
-    const style = match.match ? "CodeMirror-matchingbracket" : "CodeMirror-nonmatchingbracket"
+    const style = match.match ? defaultStyles.matching : defaultStyles.nonmatching
     decorations.push(Decoration.range(match.from, match.from + 1, {class: style}))
     if (match.to) decorations.push(Decoration.range(match.to, match.to + 1, {class: style}))
   }
@@ -96,8 +97,15 @@ export function matchBrackets(config: Config = {}) {
           // FIXME cast is muffling a justified TypeScript error
           const refDecos = idx == undefined ? undefined : (v as any).pluginViews[idx].decorations
           decorations = doMatchBrackets(v.state, refDecos, config)
-        }
+        },
+        styles: defaultStyles
       }
     }
   })
 }
+
+// FIXME themeability
+const defaultStyles = styleModule({
+  matching: {color: "#0b0"},
+  nonmatching: {color: "#a22"}
+})

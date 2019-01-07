@@ -57,7 +57,8 @@ export class DocView extends ContentView {
     onUpdateState: (prevState: EditorState, transactions: Transaction[]) => void,
     onUpdateDOM: () => void,
     onUpdateViewport: () => void,
-    getDecorations: () => DecorationSet[]
+    getDecorations: () => DecorationSet[],
+    checkRoot: () => void
   }) {
     super()
     this.setDOM(dom)
@@ -73,6 +74,7 @@ export class DocView extends ContentView {
   // into view.
   update(state: EditorState, prevState: EditorState | null = null,
          transactions: Transaction[] = [], scrollIntoView: number = -1) {
+    this.callbacks.checkRoot()
     // FIXME need some way to stabilize viewport—if a change causes the
     // top of the visible viewport to move, scroll position should be
     // adjusted to keep the content in place
@@ -395,6 +397,7 @@ export class DocView extends ContentView {
   }
 
   checkLayout(forceFull = false) {
+    this.callbacks.checkRoot()
     this.cancelLayoutCheck()
     this.measureVerticalPadding()
     let scrollIntoView = Math.min(this.scrollIntoView, this.text.length)
